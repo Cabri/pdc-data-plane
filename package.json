@@ -1,0 +1,25 @@
+{
+  "name": "pdc-data-plane",
+  "version": "1.0.0",
+  "description": "A simple data delivery tool behind the Prometheus Data Connector delivering methods of access to data-sets",
+  "keywords": [
+    "prometheus",
+    "pdc",
+    "data",
+    "connector",
+    "jwt"
+  ],
+  "license": "Apache-2.0",
+  "author": "Paul Libbrecht",
+  "type": "module",
+  "main": "pdc-data-plane.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "jsonwebtoken": "9.0.2"
+  }
+}
