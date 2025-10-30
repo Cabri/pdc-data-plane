@@ -139,10 +139,13 @@ Once decoded (e.g. with `cat file | jq -R 'split(".") | .[0],.[1] | @base64d | f
   "iat": 1761866933
 }
 
+### 7) Decrypt the URL
 The interesting part left here is the URL key which we save to the `the-url.txt.enc` then decrypt using the recipient's private key:
 
 `openssl smime -decrypt -binary -in the-url.txt.enc -inform DER -out file -inkey private_key.key`
 
+
+### 8) Download
 We obtain a URL to download:
 
 `curl --header "Authorization: Bearer `cat jwt.txt`" http://server/get/oo%2Fblop.txt`
