@@ -60,12 +60,12 @@ Actors:
 - recipient: the user who wishes to receive the data through the use of a web-server who is connected to the PDC
 - emitter: the user who offers the data, made available on the catalog and connected to the PDC
 
-### 1) Prepare keys
+### 1) Recipient: Prepare keys
 
 As documented above, the recipient needs to generate a private/public-key-pair and use it to sign.
 
 
-### 2) Identify offer and use it
+### 2) Recipient & Emitter: Identify offer, request to use it, sign contract
 The recipient discovers the offer of the emitter and indicates his intention to use it. A contract is signed for this. The recipient's integration into the PDC landscape lets him or her receive the data to their website. The contract-service is activated.
 
 If the identified data to be transmitted is personalized, we assume the subject person is the recipient.
@@ -74,7 +74,7 @@ The emitter allows the recipient by including his or her public-key to `auth.jso
 
 `{"keys":["-the-public-key"]}`
 
-### 3) Prepare PDC contacts
+### 3) Recipient: Prepare PDC contacts
 
 As with any PDC request, JWT tokens are needed to perform requests. For each the PDC of the recipient and emitter, this is done as follows:
 
@@ -82,14 +82,14 @@ As with any PDC request, JWT tokens are needed to perform requests. For each the
 
 The result is the JWT that we shall use it in the future.
 
-### 5) Prepare request
+### 5) Recipient: Prepare request
 
-Assemble a file request.mjs with code such as the following which performs a data requests:
+Assemble a file request.mjs with code such as the following which outputs a data requests:
 * along the contract 65dfa6906bd334989123c359
 * to receive to the service 65aa917120a82c6162c0a995
 * from the dataset 67b74006420746c6c551e7af
 
-It should receive access to the resource `oo/xxx.txt` and the information should be sent encrypted for the private key whose public key is given below (starting with LS0tLS1, base64 encoded) as obtained from recipients' `public_key.pem.base64`.
+It should receive access to the resource `oo/xxx.txt` and the information should be sent encrypted for the private key whose public key is given below (starting with xxx- LS0tLS1, base64 encoded) as obtained from recipients' `public_key.pem.base64`.
 
         import process from 'process';
         
@@ -107,7 +107,7 @@ It should receive access to the resource `oo/xxx.txt` and the information should
 The code above is a javascript code (so comments can be included and syntax is more free) and outputs a JSON expression if run with `node file.mjs`.
 
 
-### 6) Request ticket from the data-plane through the PDC
+### 6) Recipient: Request ticket from the data-plane through the PDC
 
 Send to your PDC the request above using the JWT authorization we have obtained.
 
@@ -139,13 +139,13 @@ Once decoded (e.g. with `cat file | jq -R 'split(".") | .[0],.[1] | @base64d | f
   "iat": 1761866933
 }
 
-### 7) Decrypt the URL
+### 7) Recipient: Decrypt the URL
 The interesting part left here is the URL key which we save to the `the-url.txt.enc` then decrypt using the recipient's private key:
 
 `openssl smime -decrypt -binary -in the-url.txt.enc -inform DER -out file -inkey private_key.key`
 
 
-### 8) Download
+### 8) Recipient: Download
 We obtain a URL to download:
 
 `curl --header "Authorization: Bearer `cat jwt.txt`" http://server/get/oo%2Fblop.txt`
