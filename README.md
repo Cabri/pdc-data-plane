@@ -13,10 +13,10 @@ Client (recipient) and server (provider) are both connected to the Prometheus Da
 The **client** creates a private key (see below) of which the public-key, base64 encoded, is exchanged in the PDC request and is excplicitly authorized for by the **server**.
 
 The client requests its PDC using the three parameters:
-* `pubkey`: the public key encoded in base64
+* `pubkey`: the public key (encoded in base64)
 * `resource`: path to data
 
-The PDC of the client exchanges with the Prometheus-X registered contrat servers then contacts the PDC of the server which validates the request and transmits the request to the path `/auth` which verifies the public-key (base64) is among the ones authorized in the file `auth.json` and, if successful, delivers a JWT which contains the following attributes in the payload:
+The PDC of the client exchanges with the Prometheus-X registered contrat servers then contacts the PDC of the server which validates the request and transmits the request to the path `/auth` which verifies the public-key (in base64) is among the ones authorized in the file `auth.json` and, if successful, delivers a JWT which contains the following attributes in the payload:
 * the request parameters above
 * the `url` key which contains a base64-encoded content which, once decrypted with the client's private key, yields the URL where to request the data-planes.
 
@@ -45,7 +45,7 @@ See the log with `pm2 log pdc-data-plane`.
 First create the password-protected private key with `openssl genrsa -aes256 -out private.pem 2048`.
 Then unprotect that key with `openssl req -x509 -nodes -days 100000 -newkey rsa:2048 -keyout private_key.pem -out certificate.pem`, the certificate infos can be answered with return).
 Then obtain its public key using `openssl rsa -in private_key.pem -pubout > public_key.pem`. 
-Now encode the public key is encoded in base64 using, for example, `base64 < public_key.pem`. This outputs a series of ASCII characters which are used in the configuration.
+Now encode the public key is encoded in base64 using, for example, `base64 < public_key.pem > public_key.pem.b64`. This outputs a series of ASCII characters which are used in the configuration.
 
 You can decrypt any stream of characters encoded in base64 in file `file.enc.b64` using the following instructions: 
 * First decode the base64: `b64decode file.enc.b64 > file.enc`
@@ -72,7 +72,7 @@ If the identified data to be transmitted is personalized, we assume the subject 
 
 The emitter allows the recipient by including his or her public-key to `auth.json` which now looks like:
 
-`{"keys":["-the-public-key"]}`
+`{"keys":["-the-public-key-in-base-64"]}`
 
 ### 3) Recipient: Prepare PDC contacts
 
@@ -99,7 +99,7 @@ It should receive access to the resource `oo/xxx.txt` and the information should
             resourceId: 'https://api.visionstrust.com/v1/catalog/serviceofferings/67b74006420746c6c551e7af',
             providerParams: {
                 query: [{resource: 'oo/xxx.txt', },
-                    {pubkey: 'xxx-the-pub-key-xxxx', },],
+                    {pubkey: 'xxx-the-pub-key-in-base-64-xxxx', },],
             },
         };
         process.stdout.write(JSON.stringify(obj));
@@ -107,7 +107,7 @@ It should receive access to the resource `oo/xxx.txt` and the information should
 The code above is a javascript code (so comments can be included and syntax is more free) and outputs a JSON expression if run with `node file.mjs`.
 
 
-### 6) Recipient: Request ticket from the data-plane through the PDC
+### 6) Recipient: Request token from the data-plane through the PDC
 
 Send to your PDC the request above using the JWT authorization we have obtained.
 
@@ -124,7 +124,7 @@ This is where the authorizations are crossed:
 - the emitter's PDC posts the responses back to the recipient's PDC
 - the recipient's PDC posts to the recipients' service documented at 65aa917120a82c6162c0a995
 
-The received POST is a JWT. It must be stored (as `jwt.txt`) as we'll use it.
+The received POST is a JWT token. It must be stored (as `jwt.txt`) as we'll use it twice: to extract the encrypted URL and to authorize the download request.
 Once decoded (e.g. with `cat file | jq -R 'split(".") | .[0],.[1] | @base64d | fromjson'` or at https://jwt.io), it looks like the following:
 
 {
