@@ -160,6 +160,10 @@ This file can be as big as necessary, and can be requested many times,... until 
 
 Status: ongoing.
 
+**Alternative Encoding for auth.json**: A format with comments is wished. TOML? XML?
+E.g. the keys could carry a comment to say who they are from.
+Status: planned.
+
 **Scoping Subpaths through the Catalog**: The routes `/auth` and `/get` are somewhat fixed and allow a requester to try (or be confused about) quite much any road.
 
 While the `/get` route is copied, so it has no big ambiguity. The `/auth` path could be the chance for the people who feed the catalog (e.g. through visionstrust) to create a product where a subdirectory is offered (so that any file can be exchanged within the frame of one offer).
