@@ -151,3 +151,19 @@ We obtain a URL to download:
 `curl --header "Authorization: Bearer `cat jwt.txt`" http://server/get/oo%2Fblop.txt`
 
 This file can be as big as necessary, and can be requested many times,... until the token is expired.
+
+---
+
+## Future Developments
+
+**Test and Spread**: The whole "addition" to the Prometheus-X dataspace connector needs to be evaluated as compatible and meeting the needs. 
+
+Status: ongoing.
+
+**Scoping Subpaths through the Catalog**: The routes `/auth` and `/get` are somewhat fixed and allow a requester to try (or be confused about) quite much any road.
+
+While the `/get` route is copied, so it has no big ambiguity. The `/auth` path could be the chance for the people who feed the catalog (e.g. through visionstrust) to create a product where a subdirectory is offered (so that any file can be exchanged within the frame of one offer).
+
+This needs a slight enrichment of the data-plane and of the catalog entries and can be done in a backwards compatible way.
+
+Status: in the thoughts.
