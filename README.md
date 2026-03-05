@@ -15,12 +15,19 @@ The **client** creates a private key (see below) of which the public-key, base64
 The client requests its PDC using the three parameters:
 * `pubkey`: the public key (encoded in base64)
 * `resource`: path to data
+* `signature`: the base64 of the signature of the string `resource=<the-path>&pubkey=<the-pubkey>`
+   where both parameter values are URL-encoded 
 
-The PDC of the client exchanges with the Prometheus-X registered contrat servers then contacts the PDC of the server which validates the request and transmits the request to the path `/auth` which verifies the public-key (in base64) is among the ones authorized in the file `auth.json` and, if successful, delivers a JWT which contains the following attributes in the payload:
+The PDC of the client exchanges with the Prometheus-X registered contract servers then contacts the PDC of the server which validates the request and transmits the request to the path `/auth` which verifies the public-key (in base64) is among the ones authorized in the file `auth.json` and, if successful, 
+delivers a JWT which contains the following attributes in the payload:
 * the request parameters above
 * the `url` key which contains a base64-encoded content which, once decrypted with the client's private key, yields the URL where to request the data-planes.
 
-That JWT is used in the Authorization header in the request fo the decrypted URL. The request is made to the pdc-data-plane server's `/get/<path>` URL. The authorization is verified and, if successful, it delivers the requested file.
+That JWT is used in the Authorization header in the request fo the decrypted URL. The request is made to the pdc-data-plane server's `/get/<path>` URL. 
+The authorization is verified and, if successful, it delivers the requested file.
+Note that, using the pdc-data-plane in this code, the authorizations are written in
+a file called `auth.json` within a directory so that the same authorizations are valid for
+all files in this directory.
 
 ## How to install
 
@@ -40,7 +47,7 @@ Start with `node pdc-data-plane.js`  or with `pm2 start pm2ecosystem.js`.
 See the log with `pm2 log pdc-data-plane`.
 
 
-## How to create a key and decrypt
+## How to create a private key for the server
 
 First create the password-protected private key with `openssl genrsa -aes256 -out private.pem 2048`.
 Then unprotect that key with `openssl req -x509 -nodes -days 100000 -newkey rsa:2048 -keyout private_key.pem -out certificate.pem`, the certificate infos can be answered with return).
@@ -51,19 +58,22 @@ You can decrypt any stream of characters encoded in base64 in file `file.enc.b64
 * First decode the base64: `b64decode file.enc.b64 > file.enc`
 * Now decrypt using `openssl smime -decrypt -binary -in file.enc -inform DER -out file -inkey private_key.key`
 * The result is in file `file`
-
 It is thinkable to use different key formats and decryption systems but that needs further crypto-agility on the side of the server.
 
 ## Concrete example
 
 Actors:
 - recipient: the user who wishes to receive the data through the use of a web-server who is connected to the PDC
-- emitter: the user who offers the data, made available on the catalog and connected to the PDC
+- emitter: the user who offers the data, made available on the catalog and connected to the PDC (also called the pdc data plane holder)
+
+Objective: obtain the resource `xlt/oulad.json.gz` from the pdc-data-plane at URL https://pdc-data-plane.cabricloud.com/
 
 ### 1) Recipient: Prepare keys
+Create a private key and extract a public key
+`openssl genrsa -out private-key.pem 4096`
+`openssl rsa -in private-key.pem -pubout > public-key.pem`
 
-As documented above, the recipient needs to generate a private/public-key-pair and use it to sign.
-
+This will output ("writing RSA key")
 
 ### 2) Recipient & Emitter: Identify offer, request to use it, sign contract
 The recipient discovers the offer of the emitter and indicates his intention to use it. A contract is signed for this. The recipient's integration into the PDC landscape lets him or her receive the data to their website. The contract-service is activated.
@@ -74,15 +84,42 @@ The emitter allows the recipient by including his or her public-key to `auth.jso
 
 `{"keys":["-the-public-key-in-base-64"]}`
 
+The recipient informs the emitter that we shall use the public-key by sending the public-key so that it is authorized.
+The emitter inserts the public-key within its `auth.json` in the (`xlt`) folder within the `data` directory.
+
+Note that the strings in JSON need the \n to replace end of lines and that even headers or trailing end-of-lines are needed: The text must match as is.
+
+ The link is now made and we can request as many times as needed. E.g. the same URL can be fetched multiple times. E.g. other files in the directory can be fetched.
+
+
+
+
 ### 3) Recipient: Prepare PDC contacts
 
-As with any PDC request, JWT tokens are needed to perform requests. For each the PDC of the recipient and emitter, this is done as follows:
+Create a message file to sign our request
 
+        echo -n "resource=`echo -n 'xlt/oulad.json.gz' | jq -sRr @uri`&pubkey=`cat public-key.pem | jq -sRr @uri`" > message-to-sign.txt
+        less message-to-sign.txt
+
+As with any PDC request, JWT tokens are needed to perform requests. For each the PDC of the recipient and emitter, this is done as follows:
 `curl   -X "POST" -H "Content-Type: application/json"  -d'{"secretKey":"-secrete-key;", "serviceKey":"-service-key-"}'  https://dev-prometheus-data-connector.cabricloud.com/login`
 
 The result is the JWT that we shall use it in the future.
 
-### 5) Recipient: Prepare request
+Sign the message file using the private key, this creates `message-signature.sign` (a binary file)
+`openssl dgst -sign private-key.pem -keyform PEM -sha256 -out message-signature.sign -binary message-to-sign.txt`
+
+(optional) You can verify that the produced signature is ok (that's what the server does), it should output `Verified OK`
+
+        openssl dgst -verify public-key.pem -keyform PEM -sha256 -signature message-signature.sign -binary message-to-sign.txt`
+        Verified OK
+
+Direct way: Call the data-plane's `/auth` route to get the JWT-token
+
+        curl -o token.jwt "https://pdc-data-plane.cabricloud.com/auth?resource=xlt%2Foulad.json.gz&pubkey=`cat public-key.pem | jq -sRr @uri`&signature=`cat message-signature.sign | base64 | jq -sRr @uri`"
+
+
+### 4) Prepare the PDC  request
 
 Assemble a file request.mjs with code such as the following which outputs a data requests:
 * along the contract 65dfa6906bd334989123c359
@@ -99,7 +136,8 @@ It should receive access to the resource `oo/xxx.txt` and the information should
             resourceId: 'https://api.visionstrust.com/v1/catalog/serviceofferings/67b74006420746c6c551e7af',
             providerParams: {
                 query: [{resource: 'oo/xxx.txt', },
-                    {pubkey: 'xxx-the-pub-key-in-base-64-xxxx', },],
+                    {pubkey: 'xxx-the-pub-key-with-backslash-n-instead-of-newlines', },
+                    {signature: 'xxxx-the-signature-file-in-base64'}],
             },
         };
         process.stdout.write(JSON.stringify(obj));
@@ -107,7 +145,7 @@ It should receive access to the resource `oo/xxx.txt` and the information should
 The code above is a javascript code (so comments can be included and syntax is more free) and outputs a JSON expression if run with `node file.mjs`.
 
 
-### 6) Recipient: Request token from the data-plane through the PDC
+### 5) Recipient: Request token from the data-plane through the PDC
 
 Send to your PDC the request above using the JWT authorization we have obtained.
 
@@ -124,8 +162,9 @@ This is where the authorizations are crossed:
 - the emitter's PDC posts the responses back to the recipient's PDC
 - the recipient's PDC posts to the recipients' service documented at 65aa917120a82c6162c0a995
 
-The received POST is a JWT token. It must be stored (as `jwt.txt`) as we'll use it twice: to extract the encrypted URL and to authorize the download request.
-Once decoded (e.g. with `cat file | jq -R 'split(".") | .[0],.[1] | @base64d | fromjson'` or at https://jwt.io), it looks like the following:
+The received POST is like the direct call to the data-plane above, it is a JWT token. 
+It must be stored (as `token.jwt`) as we'll use it twice: to extract the encrypted URL and to authorize the download request.
+Once decoded (e.g. with `cat token.jwt | jq -R 'split(".") | .[0],.[1] | @base64d | fromjson'`), it looks like the following:
 
 {
   "alg": "RS256",
@@ -139,25 +178,26 @@ Once decoded (e.g. with `cat file | jq -R 'split(".") | .[0],.[1] | @base64d | f
   "iat": 1761866933
 }
 
-### 7) Recipient: Decrypt the URL
+### 6) Recipient: Decrypt the URL
 The interesting part left here is the URL key which we save to the `the-url.txt.enc` then decrypt using the recipient's private key:
 
 `openssl smime -decrypt -binary -in the-url.txt.enc -inform DER -out file -inkey private_key.key`
 
 
-### 8) Recipient: Download
+### 7) Recipient: Download
 We obtain a URL to download:
 
-`curl --header "Authorization: Bearer `cat jwt.txt`" http://server/get/oo%2Fblop.txt`
+`curl -o file --header "Authorization: Bearer `cat token.jwt`" <the-url>
 
-This file can be as big as necessary, and can be requested many times,... until the token is expired.
+This file `file` can be as big as necessary, and can be requested many times,... until the token is expired.
+Using the current authorization configuration of the pdc-data-plane, any other file in the same folder can be requested.
+This allows to populate folders with a file for each day, for example.
 
 ---
 
 ## Future Developments
 
-**Test and Spread**: The whole "addition" to the Prometheus-X dataspace connector needs to be evaluated as compatible and meeting the needs. 
-
+**Test and Spread**: The whole "addition" to the Prometheus-X dataspace connector needs to be evaluated as compatible and meeting the needs.
 Status: ongoing.
 
 **Alternative Encoding for auth.json**: A format with comments is wished. TOML? XML?
@@ -171,3 +211,5 @@ While the `/get` route is copied, so it has no big ambiguity. The `/auth` path c
 This needs a slight enrichment of the data-plane and of the catalog entries and can be done in a backwards compatible way.
 
 Status: in the thoughts.
+
+
