@@ -15,7 +15,7 @@ const parseAuthForDir = (filepath) => {
 const directories = {
   checkAuth(resource, pubkey) {
     const config = parseAuthForDir(resource)
-    console.log("Obtained config ", config)
+    //console.log("Obtained config ", config)
     console.log("Searching for " + pubkey)
     const authKeys = config["keys"];
     return authKeys.indexOf(pubkey)>-1;
