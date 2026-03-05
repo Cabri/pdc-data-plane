@@ -51,7 +51,7 @@ const auth = (req,res)=> {
     console.log("Signature verified, creating token.")
     const expiry = Math.ceil(Date.now() / 1000) + 3600 * 8, // 2h
       payload = {
-        url: publicEncrypt(pubkey, url).toString('base64'),
+        url: url,
         resource: resource,
         pubkey: pubkeyText,
         exp: expiry,
