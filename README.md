@@ -96,10 +96,13 @@ Note that the strings in JSON need the \n to replace end of lines and that even 
 
 ### 3) Recipient: Prepare PDC contacts
 
-Create a message file to sign our request
+Create a message file to sign our request: A URL-parameter series with parameters `resource`
+and `pubkey` with both values URL-encoded.
 
         echo -n "resource=`echo -n 'xlt/oulad.json.gz' | jq -sRr @uri`&pubkey=`cat public-key.pem | jq -sRr @uri`" > message-to-sign.txt
         less message-to-sign.txt
+
+Note that, in the command above, the parameter values are processed with `jq -sRr @uri` which is a trick to perform URL-encoding with the beloved [jq](https://jqlang.org/) tool.
 
 As with any PDC request, JWT tokens are needed to perform requests. For each the PDC of the recipient and emitter, this is done as follows:
 `curl   -X "POST" -H "Content-Type: application/json"  -d'{"secretKey":"-secrete-key;", "serviceKey":"-service-key-"}'  https://dev-prometheus-data-connector.cabricloud.com/login`
@@ -107,6 +110,7 @@ As with any PDC request, JWT tokens are needed to perform requests. For each the
 The result is the JWT that we shall use it in the future.
 
 Sign the message file using the private key, this creates `message-signature.sign` (a binary file)
+
 `openssl dgst -sign private-key.pem -keyform PEM -sha256 -out message-signature.sign -binary message-to-sign.txt`
 
 (optional) You can verify that the produced signature is ok (that's what the server does), it should output `Verified OK`
@@ -118,6 +122,7 @@ Direct way: Call the data-plane's `/auth` route to get the JWT-token
 
         curl -o token.jwt "https://pdc-data-plane.cabricloud.com/auth?resource=xlt%2Foulad.json.gz&pubkey=`cat public-key.pem | jq -sRr @uri`&signature=`cat message-signature.sign | base64 | jq -sRr @uri`"
 
+Indirect way: Use a data-resource that the PDC can access. The parameters can be expressed there in a way that the PDC understands (within the JSON of the request).
 
 ### 4) Prepare the PDC  request
 

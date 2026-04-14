@@ -35,16 +35,31 @@ const auth = (req,res)=> {
     // verify signature for the string resource=<resource>&pubkey=<pubkey> in a random dir
     const dir = "tmp/" + Math.random().toString(36).substr(5);
     fs.mkdirSync(dir, { recursive: true });
-    // from https://pagefault.blog/2019/04/22/how-to-sign-and-verify-using-openssl/
-    // openssl dgst -verify key.pub -keyform PEM -sha256 -signature file.sign -binary file
-    fs.writeFileSync(path.resolve(dir,"key.pub"),  pubkey);
-    fs.writeFileSync(path.resolve(dir,"signature.sign"),  signature);
-    fs.writeFileSync(path.resolve(dir,"messagefile.txt"), `resource=${encodeURIComponent(resource)}&pubkey=${encodeURIComponent(pubkeyText)}`, {encoding:"utf8"});
-    console.log("Will verify signature in " + dir)
-    const verification = child_process.execSync(`openssl dgst -verify key.pub -keyform PEM -sha256 -signature signature.sign -binary messagefile.txt`,
-      {timeout: 10000, windowsHide: true, cwd: dir}).toString()
-    //fs.rmdirSync(dir)
-    if("Verified OK" !== verification.trim()) {
+
+    // Two alternative message formats to be signed
+    const msgs =
+      // as URL params (as indicated in the readme)
+      [`resource=${encodeURIComponent(resource)}&pubkey=${encodeURIComponent(pubkeyText)}`,
+        // as JSON object
+        JSON.stringify({pubkey:pubkeyText, resource: resource})];
+    let passed = false, verification = "", i=0;
+    for(let msg of msgs){
+      try { // from https://pagefault.blog/2019/04/22/how-to-sign-and-verify-using-openssl/
+        // openssl dgst -verify key.pub -keyform PEM -sha256 -signature file.sign -binary file
+        fs.writeFileSync(path.resolve(dir, "key.pub"), pubkey);
+        fs.writeFileSync(path.resolve(dir, "signature.sign"), signature);
+        fs.writeFileSync(path.resolve(dir, "messagefile.txt"), msg, {encoding: "utf8"});
+        console.log("Will verify signature for message " + i++ + " in " + dir)
+        verification = child_process.execSync(`openssl dgst -verify key.pub -keyform PEM -sha256 -signature signature.sign -binary messagefile.txt`,
+          {timeout: 10000, windowsHide: true, cwd: dir}).toString()
+        //fs.rmdirSync(dir)
+        passed = "Verified OK" === verification.trim();
+        if (passed)  break;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if(!passed) {
       res.status(500).send("Signature verification failed: " + verification);
       throw new Error("Signature verification failed: " + verification)
     }
