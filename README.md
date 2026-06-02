@@ -8,9 +8,12 @@ This server is best run behind an NGinx or Apache reverse proxy which sends requ
 
 ## Ideal Flow
 
-Client (recipient) and server (provider) are both connected to the Prometheus Dataspace using their PDC based on a common contract server. They have negotiated the offer of a dataset; this dataset contains a resource which we shall name `dir/datapath` . We now want to transmit it (possibly repeatedly).
+Client (recipient) and server (provider) are both connected to the Prometheus Dataspace using their PDC 
+based on a common contract server. They have negotiated the offer of a dataset; this dataset contains 
+a resource which we shall name `dir/datapath`. We now want to transmit it (possibly repeatedly).
 
-The **client** creates a private key (see below) of which the public-key, base64 encoded, is exchanged in the PDC request and is excplicitly authorized for by the **server**.
+The **client** has a private key (see below) of which the public-key, base64 encoded, is exchanged in the 
+PDC request and is excplicitly authorized for by the **server**.
 
 The client requests its PDC using the three parameters:
 * `pubkey`: the public key (encoded in base64)
@@ -18,22 +21,26 @@ The client requests its PDC using the three parameters:
 * `signature`: the base64 of the signature of the string `resource=<the-path>&pubkey=<the-pubkey>`
    where both parameter values are URL-encoded 
 
-The PDC of the client exchanges with the Prometheus-X registered contract servers then contacts the PDC of the server which validates the request and transmits the request to the path `/auth` which verifies the public-key (in base64) is among the ones authorized in the file `auth.json` and, if successful, 
-delivers a JWT which contains the following attributes in the payload:
+The PDC of the client exchanges with the Prometheus-X registered contract servers 
+then contacts the PDC of the server which validates the request and transmits 
+the request to the path `/auth` which verifies the public-key (in base64) is among the ones authorized 
+in the file `auth.json` and, if successful,  delivers a JWT which contains the following attributes in the payload:
 * the request parameters above
 * the `url` key which contains a base64-encoded content which, once decrypted with the client's private key, yields the URL where to request the data-planes.
 
-That JWT is used in the Authorization header in the request fo the decrypted URL. The request is made to the pdc-data-plane server's `/get/<path>` URL. 
+That JWT is used in the `Authorization` header in the request fo the decrypted URL. 
+The request is made to the pdc-data-plane server's `/get/<path>` URL. 
 The authorization is verified and, if successful, it delivers the requested file.
 Note that, using the pdc-data-plane in this code, the authorizations are written in
 a file called `auth.json` within a directory so that the same authorizations are valid for
 all files in this directory.
 
-## How to install
+## How to install the PDC-data-plane-server
 
 Install dependencies:  Make sure you have NodeJS (tested with v23) then run: `npm install`.
 
-The JWT tokens will all use a private key to sign the issued tokens that are delivered though the PDC and permit the secure transmission by the pdc-data-plane. See above for how to generate it.
+The JWT tokens will all use a private key to sign the issued tokens that are delivered though the PDC 
+and permit the secure transmission by the pdc-data-plane. See above for how to generate it.
 
 Configure by creating `.env` file containing the following key-value-pairs:
 
@@ -45,20 +52,25 @@ Configure by creating `.env` file containing the following key-value-pairs:
 Start with `node pdc-data-plane.js`  or with `pm2 start pm2ecosystem.js`.
 
 See the log with `pm2 log pdc-data-plane`.
+I generally couple this behind a virtual host in NGinx which has certifcates of letsencrypt (thanks guys!)
+and proxy to the local port.
 
+## Being a client: How to create a private key for the server
 
-## How to create a private key for the server
-
-First create the password-protected private key with `openssl genrsa -aes256 -out private.pem 2048`.
-Then unprotect that key with `openssl req -x509 -nodes -days 100000 -newkey rsa:2048 -keyout private_key.pem -out certificate.pem`, the certificate infos can be answered with return).
-Then obtain its public key using `openssl rsa -in private_key.pem -pubout > public_key.pem`. 
-Now encode the public key is encoded in base64 using, for example, `base64 < public_key.pem > public_key.pem.b64`. This outputs a series of ASCII characters which are used in the configuration.
+* First create the password-protected private key with `openssl genrsa -aes256 -out private.pem 2048`.
+* Then unprotect that key with `openssl req -x509 -nodes -days 100000 -newkey rsa:2048 -keyout private_key.pem -out certificate.pem`, 
+  the certificate infos can be answered with return).
+* Then obtain its public key using `openssl rsa -in private_key.pem -pubout > public_key.pem`. 
+* Now encode the public key is encoded in base64 using, for example, `base64 < public_key.pem > public_key.pem.b64`. 
+  This outputs a series of ASCII characters which are used in the configuration.
 
 You can decrypt any stream of characters encoded in base64 in file `file.enc.b64` using the following instructions: 
 * First decode the base64: `b64decode file.enc.b64 > file.enc`
 * Now decrypt using `openssl smime -decrypt -binary -in file.enc -inform DER -out file -inkey private_key.key`
 * The result is in file `file`
-It is thinkable to use different key formats and decryption systems but that needs further crypto-agility on the side of the server.
+
+It is thinkable to use different key formats and decryption systems but that needs further crypto-agility 
+on the side of the server.
 
 ## Concrete example
 
@@ -87,11 +99,11 @@ The emitter allows the recipient by including his or her public-key to `auth.jso
 The recipient informs the emitter that we shall use the public-key by sending the public-key so that it is authorized.
 The emitter inserts the public-key within its `auth.json` in the (`xlt`) folder within the `data` directory.
 
-Note that the strings in JSON need the \n to replace end of lines and that even headers or trailing end-of-lines are needed: The text must match as is.
+Note that the strings in JSON need the \n to replace end of lines and that even headers 
+or trailing end-of-lines are needed: The text must match as is.
 
- The link is now made and we can request as many times as needed. E.g. the same URL can be fetched multiple times. E.g. other files in the directory can be fetched.
-
-
+The link is now made and we can request as many times as needed. E.g. the same URL can be fetched multiple times. 
+E.g. other files in the directory can be fetched.
 
 
 ### 3) Recipient: Prepare PDC contacts
@@ -102,7 +114,8 @@ and `pubkey` with both values URL-encoded.
         echo -n "resource=`echo -n 'xlt/oulad.json.gz' | jq -sRr @uri`&pubkey=`cat public-key.pem | jq -sRr @uri`" > message-to-sign.txt
         less message-to-sign.txt
 
-Note that, in the command above, the parameter values are processed with `jq -sRr @uri` which is a trick to perform URL-encoding with the beloved [jq](https://jqlang.org/) tool.
+Note that, in the command above, the parameter values are processed with `jq -sRr @uri` 
+which is a trick to perform URL-encoding with the beloved [jq](https://jqlang.org/) tool.
 
 As with any PDC request, JWT tokens are needed to perform requests. For each the PDC of the recipient and emitter, this is done as follows:
 `curl   -X "POST" -H "Content-Type: application/json"  -d'{"secretKey":"-secrete-key;", "serviceKey":"-service-key-"}'  https://dev-prometheus-data-connector.cabricloud.com/login`
