@@ -24,9 +24,9 @@ server.listen(PORT, () => {
 const auth = (req,res)=> {
   console.log("Received req ", req)
   const params = req.body || req.query
-  console.log("Received auth ", params)
+  console.log((new Date().toISOString()) + " Received auth ", JSON.stringify(params))
   try {
-    const url = process.env.BASE_URL + "/get/" + params.resource
+    const url = process.env.BASE_URL + "/get/" + escape(params.resource)
     const pubkeyText = params.pubkey, signatureBase64 = params.signature
     if (!params || !pubkeyText || !params.resource || !signatureBase64) res.status(500).send("No valid body received (need pubkey, resource and signature")
     const resource = params.resource, pubkey = Buffer.from(pubkeyText),
@@ -54,6 +54,7 @@ const auth = (req,res)=> {
           {timeout: 10000, windowsHide: true, cwd: dir}).toString()
         //fs.rmdirSync(dir)
         passed = "Verified OK" === verification.trim();
+        console.log("Verification passed ? " + passed );
         if (passed)  break;
       } catch (e) {
         console.error(e);
