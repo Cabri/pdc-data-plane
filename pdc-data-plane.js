@@ -72,7 +72,7 @@ const auth = (req,res)=> {
       res.status(500).send(error);
       return;
     }
-    console.log((requestCounter + " ") +"Signature verified, creating token.")
+    console.log((requestCounter + " ") +"Signature verified.")
     const expiry = Math.ceil(Date.now() / 1000) + 3600 * 8, // 2h
       payload = {
         url: url,
@@ -84,7 +84,7 @@ const auth = (req,res)=> {
       const token = jwt.sign(payload, privKey, {algorithm: 'RS256'});
       res.setHeader('content-type', 'text/plain');
       console.log((requestCounter + " ") +"Responding token ", token)
-      res.send(token)
+      res.send(token.toString())
     } else {
       console.log((requestCounter + " ") + "Received authorization wrong.")
       res.status(500).send("Authorization error")
@@ -125,6 +125,33 @@ server.get("/get/:claimedResource", (req,res) => {
   // verify pubkey is authorized (directories.check)
   if(directories.checkAuth(tokenResource, pubkey)) {
     res.status(200).sendFile(directories.getPath(tokenResource))
+  } else {
+    res.status(500).send("Authorization error")
+  }
+})
+
+
+server.post("/post/:claimedResource", bodyParser.json(), (req,res) => {
+  const claimedResource = req.params.claimedResource
+  console.log("posting to " + claimedResource);
+  const body = req.body;
+  console.log("Will process body ", body)
+  const authHeader = req.header('authorization')
+  const token = authHeader && authHeader.split(' ')[1]
+  console.log("Received token ", token)
+  if (token == null) return res.sendStatus(401)
+  // verify Authorize header (own signature, expiry)
+  const verif = jwt.verify(token, privKey);
+  if(!verif) return res.sendStatus(401)
+  const pubkey = verif.pubkey;
+  const tokenResource = verif.resource;
+  let match = claimedResource.match(/(.*)\/([^/]*)/)
+  if(tokenResource !== claimedResource && (match.length !==3 && match[1] !== tokenResource)) return res.sendStatus(401)
+  // verify pubkey is authorized (directories.check)
+  if(directories.checkAuth(claimedResource, pubkey, "POST")) {
+    const b = JSON.stringify(body, null, null)
+    fs.appendFileSync(directories.getPath(claimedResource), JSON.stringify(body) + "\n")
+    res.status(200).send("OK")
   } else {
     res.status(500).send("Authorization error")
   }

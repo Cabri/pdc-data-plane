@@ -82,7 +82,7 @@ Objective: obtain the resource `xlt/oulad.json.gz` from the pdc-data-plane at UR
 
 ### 1) Recipient: Prepare keys
 Create a private key and extract a public key
-`openssl genrsa -out private-key.pem 4096`
+`openssl genrsa -out private-key.pem 4096` then
 `openssl rsa -in private-key.pem -pubout > public-key.pem`
 
 This will output ("writing RSA key")
