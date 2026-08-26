@@ -31,7 +31,8 @@ const auth = (req,res)=> {
   try {
     const url = process.env.BASE_URL + "/get/" + encodeURIComponent(params.resource)
     let pubkeyText = params.pubkey, signatureBase64 = params.signature
-    pubkeyText = Buffer.from(pubkeyText,'base64').toString('utf-8');
+    if(!pubkeyText.startsWith("-----BEGIN PUBLIC KEY-----"))
+      pubkeyText = Buffer.from(pubkeyText,'base64').toString('utf-8');
     if(!pubkeyText.endsWith("\n")) pubkeyText = pubkeyText + "\n"
     if (!params || !pubkeyText || !params.resource || !signatureBase64) res.status(500).send("No valid body received (need pubkey, resource and signature")
     const resource = params.resource, pubkey = Buffer.from(pubkeyText),
@@ -55,8 +56,13 @@ const auth = (req,res)=> {
         fs.writeFileSync(path.resolve(dir, "signature.sign"), signature);
         fs.writeFileSync(path.resolve(dir, "messagefile.txt"), msg, {encoding: "utf8"});
         console.log(requestCounter + " "+"Will verify signature for message " + i++ + " in " + dir)
-        verification = child_process.execSync(`openssl dgst -verify key.pub -keyform PEM -sha256 -signature signature.sign -binary messagefile.txt`,
-          {timeout: 10000, windowsHide: true, cwd: dir}).toString()
+        try {
+          verification = child_process.execSync(`openssl dgst -verify key.pub -keyform PEM -sha256 -signature signature.sign -binary messagefile.txt`,
+            {timeout: 10000, windowsHide: true, cwd: dir}).toString()
+        } catch (e) {
+          console.warn("Error at verifying with message " + i + " in " + dir + ": ", e);
+          passed = "Verification failed";
+        }
         //fs.rmdirSync(dir)
         passed = "Verified OK" === verification.trim();
         console.log(requestCounter + " " +"Verification passed ? " + passed );
