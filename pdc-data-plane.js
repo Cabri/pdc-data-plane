@@ -116,24 +116,43 @@ server.get("/", (req,res) => {
 });
 
 server.get("/get/:claimedResource", (req,res) => {
+  requestCounter += 1;
   const claimedResource = req.params.claimedResource
-  console.log("getting " + claimedResource);
+  console.log(requestCounter+" getting " + claimedResource);
   const authHeader = req.header('authorization')
   const token = authHeader && authHeader.split(' ')[1]
-  console.log("Received token ", token)
+  console.log(requestCounter+" Received token ", token)
   if (token == null) return res.sendStatus(401)
   // verify Authorize header (own signature, expiry)
-  const verif = jwt.verify(token, privKey);
-  if(!verif) return res.sendStatus(401)
-  const pubkey = verif.pubkey;
-  const tokenResource = verif.resource;
-  if(tokenResource !== req.params.claimedResource) return res.sendStatus(401)
-  // verify pubkey is authorized (directories.check)
-  if(directories.checkAuth(tokenResource, pubkey)) {
-    res.status(200).sendFile(directories.getPath(tokenResource))
-  } else {
-    res.status(500).send("Authorization error")
+  try {
+    const verif = jwt.verify(token, privKey);
+    if (!verif) return res.sendStatus(401)
+    const pubkey = verif.pubkey;
+    const tokenResource = verif.resource;
+    if (tokenResource !== req.params.claimedResource) {
+      console.log(requestCounter+" Wrongly claimed resource.")
+      return res.status(401).send("Wrong claimed resource.");
+    }
+    // verify pubkey is authorized (directories.check)
+    if (directories.checkAuth(tokenResource, pubkey)) {
+      console.log(requestCounter + " Sending resource " + tokenResource);
+      return res.status(200).sendFile(directories.getPath(tokenResource))
+    } else {
+      console.log(requestCounter + " Authorization error");
+      return res.status(401).send("Authorization error")
+    }
+  } catch (e) {
+    if(e.toString().startsWith("TokenExpiredError")) {
+      console.warn(requestCounter+" Token expired.")
+      res.set("WWW-Authenticate","Bearer error=\"invalid_token\"," +
+                              "error_description=\"The access token expired\"")
+      return res.status(401).send("TokenExpiredError")
+    } else {
+      console.warn("Other error ", e)
+      return res.status(500).send("Error " + JSON.stringify(e))
+    }
   }
+
 })
 
 
