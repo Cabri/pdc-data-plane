@@ -21,7 +21,7 @@ server.listen(PORT, () => {
 // authorization route; delivers an authorization behind the PDC
 // this route should only be accessible from the server of your own PDC.
 let requestCounter = 0;
-const auth = (req,res)=> {
+const authFunction = (req,res)=> {
   requestCounter += 1;
   console.log((requestCounter + " " + Date()) + " Received request from client \"" + req.header("user-agent") + "\" at address "+ req.header("x-forwarded-for")+".");
   let params = req.body || req.query
@@ -29,13 +29,15 @@ const auth = (req,res)=> {
     params = req.query;
   console.log(requestCounter + " " + " Received /auth ", JSON.stringify(params))
   try {
-    const url = process.env.BASE_URL + "/get/" + encodeURIComponent(params.resource)
+    const url = process.env.BASE_URL + params.resource
     let pubkeyText = params.pubkey, signatureBase64 = params.signature
     if(!pubkeyText.startsWith("-----BEGIN PUBLIC KEY-----"))
       pubkeyText = Buffer.from(pubkeyText,'base64').toString('utf-8');
     if(!pubkeyText.endsWith("\n")) pubkeyText = pubkeyText + "\n"
     if (!params || !pubkeyText || !params.resource || !signatureBase64) res.status(500).send("No valid body received (need pubkey, resource and signature")
-    const resource = params.resource, pubkey = Buffer.from(pubkeyText),
+    let resource = params.resource || req.path;
+    if(resource.startsWith(".")) resource = resource.substring(1)
+    const pubkey = Buffer.from(pubkeyText),
       signature = Buffer.from(signatureBase64.trim(), 'base64');
 
 
@@ -106,8 +108,8 @@ const auth = (req,res)=> {
   }
 }
 
-server.get("/auth", auth)
-server.post("/auth", auth)
+server.get("/auth", authFunction)
+server.post("/auth", authFunction)
 
 
 // delivery route
@@ -115,7 +117,7 @@ server.get("/", (req,res) => {
   res.status(200).send("This is the PDC data plane. Please see the source. https://github.com/Cabri/pdc-data-plane")
 });
 
-server.get("/get/:claimedResource", (req,res) => {
+const getResourceFunction = (req,res) => {
   requestCounter += 1;
   const claimedResource = req.params.claimedResource
   console.log(requestCounter+" getting " + claimedResource);
@@ -129,7 +131,10 @@ server.get("/get/:claimedResource", (req,res) => {
     if (!verif) return res.sendStatus(401)
     const pubkey = verif.pubkey;
     const tokenResource = verif.resource;
-    if (tokenResource !== req.params.claimedResource) {
+    let claimedResource = req.params.claimedResource || req.path;
+    if(claimedResource == null) return res.sendStatus(401)
+    if(claimedResource.startsWith(".")) claimedResource = claimedResource.substring(1);
+    if (tokenResource !== claimedResource) {
       console.log(requestCounter+" Wrongly claimed resource.")
       return res.status(401).send("Wrong claimed resource.");
     }
@@ -145,7 +150,7 @@ server.get("/get/:claimedResource", (req,res) => {
     if(e.toString().startsWith("TokenExpiredError")) {
       console.warn(requestCounter+" Token expired.")
       res.set("WWW-Authenticate","Bearer error=\"invalid_token\"," +
-                              "error_description=\"The access token expired\"")
+        "error_description=\"The access token expired\"")
       return res.status(401).send("TokenExpiredError")
     } else {
       console.warn("Other error ", e)
@@ -153,8 +158,9 @@ server.get("/get/:claimedResource", (req,res) => {
     }
   }
 
-})
+}
 
+server.get("/get/:claimedResource", getResourceFunction)
 
 server.post("/post/:claimedResource", bodyParser.json(), (req,res) => {
   const claimedResource = req.params.claimedResource
@@ -181,3 +187,6 @@ server.post("/post/:claimedResource", bodyParser.json(), (req,res) => {
     res.status(500).send("Authorization error")
   }
 })
+
+server.post("/*p", authFunction)
+server.get("/*p", getResourceFunction)
