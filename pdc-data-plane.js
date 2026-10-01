@@ -29,7 +29,7 @@ const authFunction = (req,res)=> {
     params = req.query;
   console.log(requestCounter + " " + " Received /auth ", JSON.stringify(params))
   try {
-    const url = process.env.BASE_URL + params.resource
+    const url = process.env.BASE_URL + "/" + params.resource
     let pubkeyText = params.pubkey, signatureBase64 = params.signature
     if(!pubkeyText.startsWith("-----BEGIN PUBLIC KEY-----"))
       pubkeyText = Buffer.from(pubkeyText,'base64').toString('utf-8');
@@ -130,9 +130,15 @@ const getResourceFunction = (req,res) => {
     const verif = jwt.verify(token, privKey);
     if (!verif) return res.sendStatus(401)
     const pubkey = verif.pubkey;
-    const tokenResource = verif.resource;
+    let tokenResource = verif.resource;
     let claimedResource = req.params.claimedResource || req.path;
     if(claimedResource == null) return res.sendStatus(401)
+    const cleanUp = (txt) => {
+      if(txt.startsWith(".")) txt = txt.substring(1)
+      if(txt.startsWith("/")) txt = txt.substring(1)
+      return txt;
+    }
+    tokenResource = cleanUp(tokenResource); claimedResource = cleanUp(claimedResource);
     if(claimedResource.startsWith(".")) claimedResource = claimedResource.substring(1);
     if (tokenResource !== claimedResource) {
       console.log(requestCounter+" Wrongly claimed resource.")
